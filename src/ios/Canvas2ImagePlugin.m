@@ -22,11 +22,31 @@
 - (void)saveImageDataToLibrary:(CDVInvokedUrlCommand*)command
 {
     self.callbackId = command.callbackId;
-	NSData* imageData = [[NSData alloc] initWithBase64EncodedString:[command.arguments objectAtIndex:0] options:0];
+    NSData* imageData = [[NSData alloc] initWithBase64EncodedString:[command.arguments objectAtIndex:0] options:0];
 	
-	UIImage* image = [[[UIImage alloc] initWithData:imageData] autorelease];	
-	UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+    //UIImage* image = [[[UIImage alloc] initWithData:imageData] autorelease];	
+    //UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES);
+    NSString *documentsPath = [paths objectAtIndex:0]; //Get the docs directory
+    NSString *filePath = [documentsPath stringByAppendingPathComponent:[command.arguments objectAtIndex:1]]; //Add the file name
+    BOOL success = [imageData writeToFile:filePath atomically:YES]; //Write the file
 	
+    // Was there an error?
+    if (!success)
+    {
+        // Show error message...
+        //NSLog(@"ERROR: %@",error);
+        CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_ERROR messageAsString:@"image not saved"];
+        [self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
+    }
+    else  // No errors
+    {
+        // Show message image successfully saved
+        NSLog(@"IMAGE SAVED!");
+        CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString:@"Image saved"];
+        [self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
+    }
 }
 
 - (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo
