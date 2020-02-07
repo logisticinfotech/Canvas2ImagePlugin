@@ -7,6 +7,7 @@ import java.util.Calendar;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 
+import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 
@@ -19,6 +20,10 @@ import android.os.Environment;
 import android.util.Base64;
 import android.util.Log;
 
+import org.apache.cordova.PermissionHelper;
+import android.Manifest;
+import android.content.pm.PackageManager;
+
 /**
  * Canvas2ImagePlugin.java
  *
@@ -30,17 +35,21 @@ import android.util.Log;
  */
 public class Canvas2ImagePlugin extends CordovaPlugin {
 	public static final String ACTION = "saveImageDataToLibrary";
+    CallbackContext context;
+    String [] permissions = { Manifest.permission.WRITE_EXTERNAL_STORAGE };
 
 	@Override
 	public boolean execute(String action, JSONArray data,
 			CallbackContext callbackContext) throws JSONException {
 
-		if (action.equals(ACTION)) {
+	    context = callbackContext;
+        PermissionHelper.requestPermissions(this, 0, permissions);
 
+		if (action.equals(ACTION)) {
 			String base64 = data.optString(0);
 			if (base64.equals("")) // isEmpty() requires API level 9
 				callbackContext.error("Missing base64 string");
-			
+
 			// Create the bitmap from the base64 string
 			Log.d("Canvas2ImagePlugin", base64);
 			byte[] decodedString = Base64.decode(base64, Base64.DEFAULT);
@@ -48,27 +57,48 @@ public class Canvas2ImagePlugin extends CordovaPlugin {
 			if (bmp == null) {
 				callbackContext.error("The image could not be decoded");
 			} else {
-				
+
 				// Save the image
 				File imageFile = savePhoto(bmp);
 				if (imageFile == null)
 					callbackContext.error("Error while saving image");
-				
+
 				// Update image gallery
 				scanPhoto(imageFile);
-				
+
 				callbackContext.success(imageFile.toString());
 			}
-			
+
 			return true;
 		} else {
 			return false;
 		}
 	}
 
+    public void onRequestPermissionResult(int requestCode, String[] permissions,
+                                          int[] grantResults) throws JSONException
+    {
+        PluginResult result;
+        //This is important if we're using Cordova without using Cordova, but we have the geolocation plugin installed
+        if(context != null) {
+            for (int r : grantResults) {
+                if (r == PackageManager.PERMISSION_DENIED) {
+                    result = new PluginResult(PluginResult.Status.ILLEGAL_ACCESS_EXCEPTION);
+                    context.sendPluginResult(result);
+                    return;
+                }
+
+            }
+            result = new PluginResult(PluginResult.Status.OK);
+            context.sendPluginResult(result);
+        }
+    }
+
+
 	private File savePhoto(Bitmap bmp) {
+
 		File retVal = null;
-		
+
 		try {
 			Calendar c = Calendar.getInstance();
 			String date = "" + c.get(Calendar.DAY_OF_MONTH)
@@ -91,14 +121,14 @@ public class Canvas2ImagePlugin extends CordovaPlugin {
 			if (check >= 1) {
 				folder = Environment
 					.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-				
+
 				if(!folder.exists()) {
 					folder.mkdirs();
 				}
 			} else {
 				folder = Environment.getExternalStorageDirectory();
 			}
-			
+
 			File imageFile = new File(folder, "c2i_" + date.toString() + ".png");
 
 			FileOutputStream out = new FileOutputStream(imageFile);
@@ -113,14 +143,14 @@ public class Canvas2ImagePlugin extends CordovaPlugin {
 		}
 		return retVal;
 	}
-	
-	/* Invoke the system's media scanner to add your photo to the Media Provider's database, 
+
+	/* Invoke the system's media scanner to add your photo to the Media Provider's database,
 	 * making it available in the Android Gallery application and to other apps. */
 	private void scanPhoto(File imageFile)
 	{
 		Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
 	    Uri contentUri = Uri.fromFile(imageFile);
-	    mediaScanIntent.setData(contentUri);	      		  
+	    mediaScanIntent.setData(contentUri);
 	    cordova.getActivity().sendBroadcast(mediaScanIntent);
-	} 
+	}
 }
